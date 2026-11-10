@@ -1,1 +1,1 @@
-"""Production FastAPI application package."""
+"""Modular FastAPI application."""

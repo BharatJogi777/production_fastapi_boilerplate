@@ -4,7 +4,7 @@ WORKDIR /app
 RUN addgroup --system app && adduser --system --ingroup app app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install .
+RUN pip install --no-cache-dir .
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
