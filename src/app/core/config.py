@@ -1,20 +1,26 @@
 from functools import lru_cache
 from typing import Literal
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     app_name: str = "Production FastAPI Boilerplate"
-    app_env: Literal["development","test","staging","production"] = "development"
+    app_env: Literal["development", "test", "staging", "production"] = "development"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
     secret_key: SecretStr
     access_token_expire_minutes: int = 15
     database_url: str
-    cors_origins: list[str] = []
-    allowed_hosts: list[str] = ["localhost","127.0.0.1"]
-    log_level: str = "INFO"
+    cors_origins: list[str] = Field(default_factory=list)
+    allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    http_connect_timeout_seconds: float = 3.0
+    http_read_timeout_seconds: float = 10.0
+    http_write_timeout_seconds: float = 10.0
+    http_pool_timeout_seconds: float = 3.0
+    http_max_connections: int = 100
+    http_max_keepalive_connections: int = 20
 
     @field_validator("secret_key")
     @classmethod
@@ -28,6 +34,28 @@ class Settings(BaseSettings):
     def validate_ttl(cls, value: int) -> int:
         if not 1 <= value <= 60:
             raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 60")
+        return value
+
+    @field_validator("api_v1_prefix")
+    @classmethod
+    def validate_api_prefix(cls, value: str) -> str:
+        if not value.startswith("/") or value.endswith("/"):
+            raise ValueError("API_V1_PREFIX must start with '/' and must not end with '/'")
+        return value
+
+    @field_validator("http_connect_timeout_seconds", "http_read_timeout_seconds",
+                     "http_write_timeout_seconds", "http_pool_timeout_seconds")
+    @classmethod
+    def validate_timeout(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("HTTP timeouts must be greater than zero")
+        return value
+
+    @field_validator("http_max_connections")
+    @classmethod
+    def validate_connections(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("HTTP_MAX_CONNECTIONS must be at least 1")
         return value
 
 @lru_cache

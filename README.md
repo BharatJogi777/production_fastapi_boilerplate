@@ -1,40 +1,51 @@
 # Production FastAPI Boilerplate
 
-Modular FastAPI starter: Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy async, PostgreSQL, Alembic, JWT, Argon2, Docker Compose and pytest.
+A modular, production-oriented FastAPI starter with explicit feature modules, reusable shared components, infrastructure adapters, outbound API clients, PostgreSQL/SQLAlchemy async persistence, Alembic, JWT/Argon2, Docker and pytest.
 
-## Structure
-```
+## Architecture
+See [architecture and engineering conventions](docs/architecture.md) and [testing strategy](docs/testing.md).
+
+```text
 src/app/
 ├── main.py
-├── api/{router.py,dependencies/authentication.py}
-├── core/{config.py,security.py,logging.py}
-├── common/{exceptions.py,exception_handlers.py}
-├── infrastructure/database/{base.py,session.py}
-└── modules/
-    ├── auth/{routes.py,controller.py,service.py,schemas.py}
-    ├── users/{routes.py,controller.py,service.py,repository.py,models.py,schemas.py}
-    └── health/routes.py
-migrations/  tests/
+├── api/                 # router, dependencies, middleware, exception handlers
+├── core/                # settings, security, logging, application lifecycle
+├── common/              # cross-cutting exceptions and definitions
+├── utils/               # pure generic helpers (datetime, strings, identifiers)
+├── shared/              # reusable application components (pagination, schemas, envelopes)
+├── infrastructure/      # database, HTTP transport, cache/messaging extension points
+├── clients/             # typed external provider clients (payment, notification)
+└── modules/             # feature-first modules: auth, users, health, ...
+migrations/
+tests/
+docs/
 ```
 
-Request flow: **Router → Controller → Service → Repository → Database**. Routers own HTTP concerns; controllers adapt HTTP to use cases; services own business rules and transaction boundaries; repositories own SQL/persistence; schemas define API contracts; ORM models stay internal. Avoid abstractions without a real substitution boundary.
+## Layer boundaries
+Routes handle HTTP wiring; controllers adapt transport to use cases; services own business rules and transactions; repositories own persistence; schemas define API contracts; models map database records; dependencies compose components. Shared contains reusable application behavior, utils contains stateless framework-independent helpers, infrastructure owns technical integrations, and clients contain provider-specific adapters.
 
-## Run
+Avoid premature abstractions and empty folders. Keep business rules in their feature: payment fee calculation belongs in payments, not utils.
+
+## Run locally
 ```bash
 cp .env.example .env
-# Set SECRET_KEY to output of: openssl rand -hex 32
+# Generate a local secret: openssl rand -hex 32; put it in SECRET_KEY
 uv venv && source .venv/bin/activate
 uv pip install -e ".[dev]"
 docker compose up -d db
 alembic upgrade head
 uvicorn app.main:app --app-dir src --reload --host 0.0.0.0 --port 8000
 ```
-Docs: http://localhost:8000/docs (disabled in production).
-Endpoints: GET /api/v1/health/live, GET /api/v1/health/ready, POST /api/v1/auth/register, POST /api/v1/auth/login, GET /api/v1/users/me.
 
-## Quality
+API docs are available at `/docs` outside production. Endpoints: `/api/v1/health/live`, `/api/v1/health/ready`, `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/users/me`.
+
+## Quality commands
 ```bash
-ruff check . && ruff format --check . && mypy src && pytest
+ruff check .
+ruff format --check .
+mypy src
+pytest
 ```
 
-This is a production-oriented baseline, not a certification. Before public deployment add/threat-model distributed rate limiting, refresh-token rotation/revocation, email verification/password reset, login abuse controls, audit events, managed secrets/key rotation, TLS, production CORS/host allow-lists, backups/PITR, release migration jobs, metrics/tracing, dependency/image scanning, graceful shutdown and deployment-specific pool sizing.
+## Before public deployment
+This is a baseline, not production certification. Configure TLS/ingress, managed secrets and key rotation, production CORS/host allowlists, distributed rate limiting, refresh-token rotation/revocation, email verification/password reset, login abuse controls, audit events, PostgreSQL backups/PITR, release migration jobs, metrics/tracing/alerting, dependency and image scanning, worker/connection-pool sizing, graceful termination and rollback. See the architecture guide for the reasoning.

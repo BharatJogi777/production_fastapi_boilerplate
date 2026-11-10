@@ -1,0 +1,9 @@
+from datetime import UTC, datetime
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+def ensure_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise ValueError("Naive datetimes are not allowed")
+    return value.astimezone(UTC)

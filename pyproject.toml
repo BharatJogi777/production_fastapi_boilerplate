@@ -1,13 +1,27 @@
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
 [project]
 name = "production-fastapi-boilerplate"
-version = "0.2.0"
+version = "0.3.0"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1","uvicorn[standard]>=0.30,<1","pydantic[email]>=2.8,<3","pydantic-settings>=2.4,<3","sqlalchemy[asyncio]>=2,<3","asyncpg>=0.29,<1","alembic>=1.13,<2","PyJWT[crypto]>=2.9,<3","pwdlib[argon2]>=0.2,<1","python-multipart>=0.0.9","structlog>=24.4,<26"]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "pydantic[email]>=2.8,<3",
+  "pydantic-settings>=2.4,<3",
+  "sqlalchemy[asyncio]>=2,<3",
+  "asyncpg>=0.29,<1",
+  "alembic>=1.13,<2",
+  "PyJWT[crypto]>=2.9,<3",
+  "pwdlib[argon2]>=0.2,<1",
+  "python-multipart>=0.0.9",
+  "structlog>=24.4,<26",
+  "httpx>=0.27,<1",
+]
 [project.optional-dependencies]
-dev = ["pytest>=8.3,<9","pytest-asyncio>=0.24,<2","httpx>=0.27,<1","aiosqlite>=0.20,<1","ruff>=0.6,<1","mypy>=1.11,<2"]
+dev = ["pytest>=8.3,<9", "pytest-asyncio>=0.24,<2", "aiosqlite>=0.20,<1", "ruff>=0.6,<1", "mypy>=1.11,<2"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/app"]
 [tool.pytest.ini_options]
@@ -17,9 +31,9 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src","tests"]
+src = ["src", "tests"]
 [tool.ruff.lint]
-select = ["E","F","I","B","UP","ASYNC"]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
 ignore = ["B008"]
 [tool.mypy]
 python_version = "3.12"
