@@ -1,33 +1,41 @@
 # Architecture and engineering conventions
 
+## Architecture layers
+
+- `api/`: HTTP transport, routing, middleware and dependency composition.
+- `modules/<feature>/`: feature-first vertical slices (routes, controller, schemas, service, repository, models).
+- `core/`: settings, security primitives, logging and application lifecycle.
+- `common/`: cross-cutting exceptions and stable application contracts.
+- `shared/`: reusable application-level schemas, pagination, envelopes and serializers.
+- `utils/`: pure generic helpers with no application side effects.
+- `infrastructure/`: technical adapters for databases, cache, messaging and HTTP transport.
+- `clients/`: typed provider-specific outbound adapters.
+- `migrations/`: versioned schema changes; never run migrations in web worker startup.
+
 ## Dependency direction
-HTTP/API adapters depend on application services. Services own business policy and use repository contracts only where there is a real substitution boundary. Infrastructure implements technical concerns. Feature modules own their business rules. Generic helpers must not import FastAPI, SQLAlchemy or a feature module.
 
-## Layer responsibilities
-- `modules/<feature>/routes.py`: HTTP method, path, dependencies, status and response model.
-- `controller.py`: maps transport schemas to use cases and maps results back.
-- `service.py`: use cases, business invariants and transaction boundary.
-- `repository.py`: persistence queries; no HTTP or business policy.
-- `schemas.py`: validated input/output contracts. Never return ORM entities directly.
-- `models.py`: persistence mappings only.
-- `dependencies.py`: feature-specific dependency composition.
-- `shared/`: reusable application components (pagination, API base schemas, response envelope).
-- `utils/`: generic deterministic helpers without application side effects.
-- `common/`: cross-cutting errors/types/constants; not a dumping ground.
-- `infrastructure/`: database, cache, messaging and outbound transport implementations.
-- `clients/`: typed adapters per external provider, sharing the lifespan-managed HTTPX pool.
+HTTP adapters call application services. Services own business policy and transaction boundaries. Repositories own persistence queries and never commit. Infrastructure implements technical integrations. Shared/core/infrastructure must not import business feature modules. Provider-specific DTOs remain inside the provider client.
 
-## Reliability rules
-1. Set connect/read/write/pool timeouts on outbound HTTP clients.
-2. Retry only operations proven idempotent; never blindly retry payment or email POST requests.
-3. Bound connection pools and size them with worker count and upstream capacity in mind.
-4. Never log credentials, authorization headers, tokens, passwords or sensitive payloads.
-5. Keep DB transactions short; do not make network calls while holding a DB transaction.
-6. Add idempotency keys for externally retried write operations.
-7. Use request IDs for log correlation; validate untrusted inbound IDs.
-8. Keep liveness independent of dependencies; readiness checks required dependencies.
-9. Run migrations as a release step, not in every web worker.
-10. Add abstractions only after a real use case or stable contract exists.
+Use interfaces/Protocols only at actual substitution or testing boundaries. Avoid generic repository frameworks, service locators, speculative event buses and empty abstraction folders.
 
-## Production rollout checklist
-Configure TLS at ingress, secrets manager/key rotation, production CORS/host allowlists, distributed rate limiting, refresh-token rotation/revocation, audit trails, backups/PITR, migration job, metrics/traces/alerting, dependency/image scanning, worker/pool sizing, graceful termination and rollback. These require deployment infrastructure and are not faked by this starter.
+## Service boundary
+
+Each microservice owns its database, schema, migrations, API contract, deployment and release lifecycle. Do not share ORM models or repositories between independently deployed services. Communicate through versioned APIs or asynchronous messages. Use the outbox/inbox pattern when reliable database-to-message publication is required.
+
+## Database and transactions
+
+Use one request-scoped AsyncSession. Repository methods may add/flush/query but must not commit. Application services commit or roll back the unit of work. Keep transactions short and never make network calls while holding a DB transaction. Use Alembic as schema source of truth. SQLite is for fast tests only; PostgreSQL integration tests are required before release.
+
+## Reliability
+
+1. Configure explicit outbound timeouts and bounded connection pools.
+2. Retry only idempotent operations; never blindly retry payment/email writes.
+3. Use idempotency keys for externally retried writes.
+4. Bound concurrency and pool sizes against downstream capacity.
+5. Never log credentials, tokens, passwords or sensitive payloads.
+6. Validate and propagate request IDs.
+7. Keep liveness dependency-independent; readiness checks mandatory dependencies.
+8. Run migrations as a release job, not in each web worker.
+9. Add rate limiting, circuit breakers, metrics and tracing according to the service's deployment and threat model.
+
+See [service template guide](service-template.md), [production readiness](production-readiness.md) and [testing strategy](testing.md).

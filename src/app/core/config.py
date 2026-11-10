@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,12 +13,17 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Production FastAPI Boilerplate"
+    service_name: str = "fastapi-service"
     app_env: Literal["development", "test", "staging", "production"] = "development"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
     secret_key: SecretStr
     access_token_expire_minutes: int = 15
     database_url: str
+    database_pool_size: int = 10
+    database_max_overflow: int = 20
+    database_pool_timeout_seconds: float = 30.0
+    database_pool_recycle_seconds: int = 1800
     cors_origins: list[str] = Field(default_factory=list)
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
@@ -55,24 +60,41 @@ class Settings(BaseSettings):
         "http_read_timeout_seconds",
         "http_write_timeout_seconds",
         "http_pool_timeout_seconds",
+        "database_pool_timeout_seconds",
     )
     @classmethod
     def validate_timeout(cls, value: float) -> float:
         if value <= 0:
-            raise ValueError("HTTP timeouts must be greater than zero")
+            raise ValueError("Timeout values must be greater than zero")
         return value
 
-    @field_validator("http_max_connections")
+    @field_validator("http_max_connections", "database_pool_size")
     @classmethod
-    def validate_connections(cls, value: int) -> int:
+    def validate_positive_connections(cls, value: int) -> int:
         if value < 1:
-            raise ValueError("HTTP_MAX_CONNECTIONS must be at least 1")
+            raise ValueError("Connection pool sizes must be at least 1")
         return value
+
+    @field_validator("database_max_overflow", "database_pool_recycle_seconds")
+    @classmethod
+    def validate_non_negative(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("Database pool values cannot be negative")
+        return value
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.app_env == "production":
+            if self.debug:
+                raise ValueError("DEBUG must be false in production")
+            if not self.allowed_hosts or "*" in self.allowed_hosts:
+                raise ValueError("Production ALLOWED_HOSTS must be explicit")
+            if "*" in self.cors_origins:
+                raise ValueError("Wildcard CORS origins are not allowed in production")
+        return self
 
 
 @lru_cache
 def get_settings() -> Settings:
     # BaseSettings resolves required values from environment/.env at runtime.
-    # The empty kwargs expansion avoids mypy treating environment-backed fields
-    # as missing constructor arguments; Pydantic still performs full validation.
     return Settings(**{})

@@ -1,45 +1,51 @@
-# Production FastAPI Boilerplate
+# Production FastAPI Microservice Template
 
-A modular, production-oriented FastAPI starter with explicit feature modules, reusable shared components, infrastructure adapters, outbound API clients, PostgreSQL/SQLAlchemy async persistence, Alembic, JWT/Argon2, Docker and pytest.
+A reusable FastAPI foundation for independently deployable microservices. It provides a modular application structure, async SQLAlchemy/PostgreSQL, Alembic, JWT/Argon2 examples, request correlation, centralized errors, outbound HTTP infrastructure, Docker and tests.
+
+**This is a starter template, not production certification.** Each service must configure its own secrets, data store, deployment, SLOs and operational integrations.
 
 ## Architecture
-See [architecture and engineering conventions](docs/architecture.md) and [testing strategy](docs/testing.md).
+
+See:
+- [Architecture and engineering conventions](docs/architecture.md)
+- [Creating a service from this template](docs/service-template.md)
+- [Production readiness checklist](docs/production-readiness.md)
+- [Testing strategy](docs/testing.md)
 
 ```text
 src/app/
 ├── main.py
-├── api/                 # router, dependencies, middleware, exception handlers
-├── core/                # settings, security, logging, application lifecycle
-├── common/              # cross-cutting exceptions and definitions
-├── utils/               # pure generic helpers (datetime, strings, identifiers)
-├── shared/              # reusable application components (pagination, schemas, envelopes)
-├── infrastructure/      # database, HTTP transport, cache/messaging extension points
-├── clients/             # typed external provider clients (payment, notification)
-└── modules/             # feature-first modules: auth, users, health, ...
-migrations/
+├── api/                 # router, dependencies, middleware
+├── core/                # settings, security, logging, lifecycle
+├── common/              # errors and stable cross-cutting contracts
+├── shared/              # reusable schemas, pagination, responses
+├── utils/               # pure helpers
+├── infrastructure/      # database and technical adapters
+├── clients/             # provider-specific outbound clients
+└── modules/             # feature-first business modules
+migrations/              # Alembic migrations
 tests/
 docs/
 ```
 
-## Layer boundaries
-Routes handle HTTP wiring; controllers adapt transport to use cases; services own business rules and transactions; repositories own persistence; schemas define API contracts; models map database records; dependencies compose components. Shared contains reusable application behavior, utils contains stateless framework-independent helpers, infrastructure owns technical integrations, and clients contain provider-specific adapters.
+## Quick start
 
-Avoid premature abstractions and empty folders. Keep business rules in their feature: payment fee calculation belongs in payments, not utils.
-
-## Run locally
 ```bash
 cp .env.example .env
-# Generate a local secret: openssl rand -hex 32; put it in SECRET_KEY
-uv venv && source .venv/bin/activate
+# Set a unique secret and database password in .env
+openssl rand -hex 32
+uv venv
+source .venv/bin/activate
 uv pip install -e ".[dev]"
 docker compose up -d db
 alembic upgrade head
 uvicorn app.main:app --app-dir src --reload --host 0.0.0.0 --port 8000
 ```
 
-API docs are available at `/docs` outside production. Endpoints: `/api/v1/health/live`, `/api/v1/health/ready`, `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/users/me`.
+API docs are available at `/docs` outside production. Sample endpoints include `/api/v1/health/live`, `/api/v1/health/ready`, `/api/v1/auth/register`, `/api/v1/auth/login` and `/api/v1/users/me`.
 
-## Quality commands
+## Quality checks
+
 ```bash
 ruff check .
 ruff format --check .
@@ -47,5 +53,8 @@ mypy src
 pytest
 ```
 
-## Before public deployment
-This is a baseline, not production certification. Configure TLS/ingress, managed secrets and key rotation, production CORS/host allowlists, distributed rate limiting, refresh-token rotation/revocation, email verification/password reset, login abuse controls, audit events, PostgreSQL backups/PITR, release migration jobs, metrics/tracing/alerting, dependency and image scanning, worker/connection-pool sizing, graceful termination and rollback. See the architecture guide for the reasoning.
+For PostgreSQL-backed validation, run the disposable database integration environment described in [testing.md](docs/testing.md). The default SQLite suite is not a substitute.
+
+## Reuse model
+
+Keep generic infrastructure in the template. Keep payment, order, notification and other business behavior inside the service that owns it. Optional integrations should be added only when a service needs them. See [service-template.md](docs/service-template.md).
