@@ -1,10 +1,17 @@
 from functools import lru_cache
 from typing import Literal
+
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     app_name: str = "Production FastAPI Boilerplate"
     app_env: Literal["development", "test", "staging", "production"] = "development"
     debug: bool = False
@@ -43,8 +50,12 @@ class Settings(BaseSettings):
             raise ValueError("API_V1_PREFIX must start with '/' and must not end with '/'")
         return value
 
-    @field_validator("http_connect_timeout_seconds", "http_read_timeout_seconds",
-                     "http_write_timeout_seconds", "http_pool_timeout_seconds")
+    @field_validator(
+        "http_connect_timeout_seconds",
+        "http_read_timeout_seconds",
+        "http_write_timeout_seconds",
+        "http_pool_timeout_seconds",
+    )
     @classmethod
     def validate_timeout(cls, value: float) -> float:
         if value <= 0:
@@ -58,6 +69,10 @@ class Settings(BaseSettings):
             raise ValueError("HTTP_MAX_CONNECTIONS must be at least 1")
         return value
 
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    # BaseSettings resolves required values from environment/.env at runtime.
+    # The empty kwargs expansion avoids mypy treating environment-backed fields
+    # as missing constructor arguments; Pydantic still performs full validation.
+    return Settings(**{})
