@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
-import httpx
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
