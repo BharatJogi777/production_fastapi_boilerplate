@@ -1,6 +1,5 @@
 import pytest
 from fastapi import FastAPI, HTTPException
-from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
 
 from app.common.exception_handlers import register_exception_handlers
@@ -25,6 +24,10 @@ def error_app() -> FastAPI:
     async def upstream() -> None:
         raise ExternalServiceError("catalog", "connection refused")
 
+    @app.get("/validation")
+    async def validation(secret: int) -> dict[str, int]:
+        return {"secret": secret}
+
     @app.get("/unexpected")
     async def unexpected() -> None:
         raise RuntimeError("sensitive internal detail")
@@ -47,6 +50,15 @@ async def test_http_error_uses_common_envelope(error_app: FastAPI) -> None:
         response = await client.get("/http-error")
     assert response.status_code == 404
     assert response.json()["error"]["message"] == "Not found"
+
+
+@pytest.mark.asyncio
+async def test_validation_error_does_not_echo_submitted_value(error_app: FastAPI) -> None:
+    async with AsyncClient(transport=ASGITransport(app=error_app), base_url="http://test") as client:
+        response = await client.get("/validation", params={"secret": "do-not-leak-this"})
+    assert response.status_code == 422
+    assert "do-not-leak-this" not in response.text
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 @pytest.mark.asyncio
